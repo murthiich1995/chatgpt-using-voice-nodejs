@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>chatGPT using voice</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="public/bootstrap.min.css">
+    <link rel="stylesheet" href="public/style.css">
+    <link rel="icon" href="public/images/logo.png">
+    <script src="public/jquery.min.js"></script>
+    <script src="public/underscore.min.js"></script>
+    <script src="public/bootstrap.min.js"></script>
+    <script src="https://use.fontawesome.com/fc36d6ab60.js"></script>
+
+    <style>
+        .well1 {
+            border: 2px solid #5fb4ac;
+            padding: 25px;
+            border-radius: 7px;
+            width: 100%;
+            box-shadow: 7px 7px 7px #5fb4ac;
+        }
+
+        hr {
+            margin-top: 10px;
+            margin-bottom: 20px;
+            border: 0;
+            border-top: 2px solid #63b8b0;
+        }
+    </style>
+</head>
+
+<body style="padding:50px;">
+    <div class="row" id="mainfunctionalitydivision">
+        <h1>CHATGPT With Voice</h1>
+        <div>
+        </div><br>
+        <div id="controls">
+            <button class="btn btn-primary" id="recordButton">Record</button>
+            <button class="btn btn-primary" id="transcribeButton" disabled>Complete Chat</button>
+        </div><br><br>
+        <h3>Transcribed Text</h3>
+        <div class="well1" id="transcriptdiv"></div><br><br>
+        <h3>chatGPT Response</h3>
+        <div class="well1" id="output"></div><br><br>
+    </div>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+    
+    <script>
+        let rec = null;
+        let audioStream = null;
+
+        const recordButton = document.getElementById("recordButton");
+        const transcribeButton = document.getElementById("transcribeButton");
+
+        recordButton.addEventListener("click", startRecording);
+        transcribeButton.addEventListener("click", transcribeText);
+
+        function startRecording() {
+            let constraints = { audio: true, video: false }
+            recordButton.disabled = true;
+            transcribeButton.disabled = false;
+
+            navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+                const audioContext = new window.AudioContext();
+                audioStream = stream;
+                const input = audioContext.createMediaStreamSource(stream);
+                rec = new Recorder(input, { numChannels: 1 })
+                rec.record()
+                document.getElementById("output").innerHTML = "Recording started..."
+            }).catch(function (err) {
+                recordButton.disabled = false;
+                transcribeButton.disabled = true;
+            });
+        }
+
+        function transcribeText() {
+            document.getElementById("output").innerHTML = "Converting audio to text..."
+            transcribeButton.disabled = true;
+            recordButton.disabled = false;
+            rec.stop();
+            audioStream.getAudioTracks()[0].stop();
+            rec.exportWAV(uploadSoundData);
+        }
+
+        function uploadSoundData(blob) {
+            const filename = "sound-file-" + new Date().getTime() + ".wav";
+            const formData = new FormData();
+            formData.append("audio_data", blob, filename);
+
+            fetch('http://localhost:3000/notes', {
+                method: 'POST',
+                body: formData
+            }).then(async result => {
+                let results = await result.text();
+                console.log(JSON.parse(results)["text"]["choices"][0]["message"]["content"])
+                let displayresult = JSON.parse(results)["text"]["choices"][0]["message"]["content"];
+                displayresult = displayresult.replaceAll("\n", "</br>");
+                document.getElementById("output").innerHTML = displayresult;
+                document.getElementById("transcriptdiv").innerHTML = JSON.parse(results)["transcript"];
+            }).catch(error => {
+                document.getElementById("output").innerHTML = "An error occurred: " + error;
+            })
+        }
+    </script>
+</body>
+</html>
